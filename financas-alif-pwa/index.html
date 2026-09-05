@@ -1225,6 +1225,11 @@ td.num,th.num{text-align:right;}
 .row.selected .sel-check{background:var(--accent-strong);border-color:var(--accent-strong);}
 .sel-bar{position:sticky;bottom:-20px;margin:10px -16px -20px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:var(--bg);border-top:1px solid var(--border);display:flex;gap:10px;align-items:center;}
 .sel-bar .sel-count{flex:1;font-size:13px;font-weight:700;}
+#splash{position:fixed;inset:0;background:var(--accent-strong);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:9999;transition:opacity .45s ease, visibility .45s ease;}
+#splash.hide{opacity:0;visibility:hidden;pointer-events:none;}
+.splash-cifrao{color:#fff;font-size:110px;font-weight:900;line-height:1;}
+.splash-frase{color:#fff;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;opacity:.85;text-align:center;padding:0 24px;}
+.splash-topo{position:absolute;top:calc(28px + env(safe-area-inset-top));left:0;right:0;text-align:center;color:#fff;font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.92;padding:0 20px;}
 </style><link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1e8f5a">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1234,6 +1239,12 @@ td.num,th.num{text-align:right;}
 </head>
 
 <body>
+<div id="splash">
+<div class="splash-topo">DEUS ACIMA DE TUDO</div>
+<div class="splash-frase">SI VIS PACEM, PARA BELLUM</div>
+<span class="splash-cifrao">$</span>
+<div class="splash-frase">SI VIS PACEM, PARA BELLUM</div>
+</div>
 <div id="root"></div>
 <script>
 (function(){
@@ -2080,7 +2091,6 @@ function pageDashboard(){
   ensureAllGenerated();
   var mk = currentMesAno();
   var r = resumoMes(mk);
-  var atual = saldoAtual();
   var prev = saldoPrevistoFimMes();
   var aReceber = totalAReceberEmprestimos();
   var futuras = todasSaidasFlat().filter(function(s){ return monthKey(s.vencimento)===mk && effStatus(s)!=="pago" && s.status!=="cancelado"; }).reduce(function(s,x){return s+x.valor;},0);
@@ -2091,12 +2101,11 @@ function pageDashboard(){
 
   /* ── FINANÇAS ── */
   html += '<div class="section eyebrow">💰 FINANÇAS</div>';
-  html += '<div class="grid2 section">';
-  html += statCard("💰","Saldo atual", fmtBRL(atual), atual>=0?"pos":"neg", "Entradas: "+fmtBRL(r.entradas), "Modals.open('detalhe','saldo-atual')");
+  html += '<div class="section">' + mesFlowCard(r.entradas, r.saidas) + '</div>';
+
+  html += '<div class="section">';
   html += statCard("💳","Despesas futuras", fmtBRL(futuras), "", null, "Modals.open('detalhe','despesas-futuras')");
   html += '</div>';
-
-  html += '<div class="section">' + mesFlowCard(r.entradas, r.saidas) + '</div>';
 
   html += '<div class="section">';
   html += '<div class="insight">'+esc(STATE.perfil.nome)+', suas despesas deste mês estão em <b>'+fmtBRL(r.saidas)+'</b>.</div>';
@@ -2846,16 +2855,7 @@ function modalContent(){
 function sheetDetalhe(tipo){
   var mk = currentMesAno();
   var titulo = "", sub = "", rows = "", total = 0;
-  if(tipo==="saldo-atual"){
-    titulo = "💰 Saldo atual"; sub = "Composição do saldo: tudo que já entrou menos tudo que já foi pago.";
-    var hoje = todayISO();
-    var entradasPagas = STATE.entradas.filter(function(e){return e.data<=hoje;});
-    var saidasPagas = todasSaidasFlat().filter(function(s){return s.status==="pago";});
-    total = saldoAtual();
-    entradasPagas.forEach(function(e){ rows += entradaRow(e); });
-    saidasPagas.forEach(function(s){ rows += saidaRow(s); });
-    if(!entradasPagas.length && !saidasPagas.length) rows = '<div class="empty">Nada registrado ainda.</div>';
-  } else if(tipo==="despesas-futuras"){
+  if(tipo==="despesas-futuras"){
     titulo = "💳 Despesas futuras"; sub = "Contas de "+monthLabel(mk)+" que ainda não foram pagas.";
     var itens = todasSaidasFlat().filter(function(s){ return monthKey(s.vencimento)===mk && effStatus(s)!=="pago" && s.status!=="cancelado"; });
     total = itens.reduce(function(s,x){return s+x.valor;},0);
@@ -3811,6 +3811,13 @@ function init(){
   }
 
   render();
+
+  setTimeout(function(){
+    var sp = document.getElementById("splash");
+    if(!sp) return;
+    sp.classList.add("hide");
+    setTimeout(function(){ sp.remove(); }, 500);
+  }, 700);
 }
 
 init();
