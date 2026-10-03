@@ -164,6 +164,7 @@ h2{font-family:var(--font-display);font-size:16px;margin:0;font-weight:700;lette
 .list{display:flex;flex-direction:column;gap:8px;}
 .row{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:11px 12px;cursor:pointer;box-shadow:var(--shadow);transition:transform .12s;}
 .emoji{width:40px;height:40px;border-radius:13px;background:var(--surface-alt);display:flex;align-items:center;justify-content:center;font-size:17px;flex:none;font-weight:700;font-family:var(--font-display);color:var(--ink);}
+.skull-av{background:#000 !important;display:flex;align-items:center;justify-content:center;padding:0;border:1px solid rgba(255,255,255,.18);box-shadow:0 6px 18px rgba(0,0,0,.45);}
 .avatar{width:40px;height:40px;border-radius:14px;background:var(--grad);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:var(--font-display);font-size:15px;flex:none;}
 .info{flex:1;min-width:0;}
 .title{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -352,6 +353,7 @@ var UI = { page:"dashboard", modal:null, modalData:null, histAno:null, histMes:n
 var LAST_RENDER = { page:null, pessoaSel:null, modal:null, confirm:false };
 
 /* ============================== ÍCONES (SVG) ============================== */
+var SKULL_SVG = '<svg viewBox="96 60 320 400" width="80%" height="80%" aria-hidden="true"><g fill="#f4f4f4"><path d="M256 70C352 70 404 136 404 218C404 268 386 300 362 320L150 320C126 300 108 268 108 218C108 136 160 70 256 70Z"/><rect x="163" y="296" width="26" height="86" rx="13"/><rect x="195" y="296" width="26" height="122" rx="13"/><rect x="227" y="296" width="26" height="146" rx="13"/><rect x="259" y="296" width="26" height="146" rx="13"/><rect x="291" y="296" width="26" height="122" rx="13"/><rect x="323" y="296" width="26" height="86" rx="13"/></g><g fill="#000"><path d="M146 196L240 212L234 262L196 280L158 254Z"/><path d="M366 196L272 212L278 262L316 280L354 254Z"/><path d="M256 266L241 300L271 300Z"/><rect x="189" y="318" width="6" height="30"/><rect x="221" y="318" width="6" height="30"/><rect x="253" y="318" width="6" height="30"/><rect x="285" y="318" width="6" height="30"/><rect x="317" y="318" width="6" height="30"/></g></svg>';
 var ICONS = {
   home:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
   "in":'<path d="M17 7 7 17"/><path d="M17 17H7V7"/>',
@@ -1364,7 +1366,7 @@ function topbar(){
       + '<div class="topbar-row">'
       + '<div style="min-width:0;"><div class="greet-sm">'+saudacao()+' 💀</div><h1>'+esc(STATE.perfil.nome)+'</h1></div>'
       + '<div class="top-actions">'+olho
-      + '<button class="me-avatar" title="Perfil" onclick="Nav.go(\'perfil\')">'+esc(STATE.perfil.nome.slice(0,1).toUpperCase())+'</button>'
+      + '<button class="me-avatar skull-av" title="Perfil" onclick="Nav.go(\'perfil\')">'+SKULL_SVG+'</button>'
       + '</div></div></div>';
   }
   var titles = { entradas:"Entradas", saidas:"Saídas", emprestimos:"Empréstimos", pessoa:"Empréstimos",
@@ -2071,7 +2073,7 @@ function pageRelatorios(){
 function pagePerfil(){
   var tema = STATE.perfil.tema || "sistema";
   var html = '<div class="card section" style="text-align:center;">'
-    + '<div class="avatar" style="margin:0 auto 10px;width:60px;height:60px;font-size:22px;">'+esc(STATE.perfil.nome.slice(0,1))+'</div>'
+    + '<div class="avatar skull-av" style="margin:0 auto 10px;width:72px;height:72px;border-radius:22px;">'+SKULL_SVG+'</div>'
     + '<h2>'+esc(STATE.perfil.nome)+'</h2><p class="muted small">Moeda: Real brasileiro (R$)</p></div>';
   html += '<div class="section"><button class="btn btn-secondary" onclick="Modals.open(\'editar-perfil\')">Editar nome</button></div>';
 
