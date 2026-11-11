@@ -300,6 +300,12 @@ td.num,th.num{text-align:right;}
 .splash-cifrao{color:#fff;font-family:var(--font-display);font-size:104px;font-weight:700;line-height:1;}
 .splash-frase{color:#fff;font-size:12.5px;font-weight:600;letter-spacing:.28em;text-transform:uppercase;opacity:.85;text-align:center;padding:0 24px;}
 .splash-topo{position:absolute !important;top:calc(30px + env(safe-area-inset-top,0px));left:0;right:0;text-align:center;color:#fff;font-size:12px;font-weight:700;letter-spacing:.3em;text-transform:uppercase;opacity:.95;padding:0 20px;}
+.anexo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.anexo{position:relative;aspect-ratio:1/1;border-radius:16px;overflow:hidden;background:var(--surface-alt);border:1px solid var(--border);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.anexo img{width:100%;height:100%;object-fit:cover;display:block;}
+.anexo .anexo-ic{font-size:34px;margin-bottom:18px;}
+.anexo .nm{position:absolute;left:0;right:0;bottom:0;padding:4px 6px;font-size:10.5px;font-weight:600;color:#fff;background:rgba(0,0,0,.58);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.aviso-hoje{border-color:var(--violet);box-shadow:0 0 0 1px var(--violet),var(--shadow);}
 @media (prefers-reduced-motion: reduce){ *{transition:none!important;animation:none!important;} }
 </style><link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#000000">
@@ -1312,6 +1318,7 @@ function render(){
   LAST_RENDER = { page:UI.page, pessoaSel:UI.pessoaSel, modal:UI.modal, confirm:!!UI.confirm };
   if(UI.modal==="novo-emprestimo") Forms.updateJurosPreview();
   if(UI.modal==="simulador-juros") Forms.updateSimuladorPreview();
+  if(UI.modal==="estender-emprestimo" || UI.modal==="estender-parcelada") Forms.previewEstender();
 }
 
 function renderShell(animar){
@@ -1413,6 +1420,7 @@ function pageDashboard(){
   var html = "";
 
   /* ── HERO: saldo do mês ── */
+  html += bannerVencimentos();
   html += '<div class="section">' + heroSaldo(mk, r) + '</div>';
 
   /* ── AÇÕES RÁPIDAS ── */
@@ -1685,7 +1693,8 @@ function pageEmprestimos(){
   html += '<div class="section btn-row">'
     + '<button class="btn btn-primary" onclick="Modals.open(\'novo-emprestimo\')">'+ic("plus")+' Novo empréstimo</button>'
     + '<button class="btn btn-secondary" onclick="Modals.open(\'simulador-juros\')">'+ic("calc")+' Simular</button>'
-    + '</div>';
+    + '</div>'
+    + '<div class="section"><button class="btn btn-secondary" style="width:100%;" onclick="Modals.open(\'alarmes\')">🔔 Alarmes de vencimento</button></div>';
 
   /* ── CALENDÁRIO DE RECEBIMENTOS ── */
   if(!UI.empCalMes) UI.empCalMes = mkAtual;
@@ -1819,6 +1828,7 @@ function pagePessoaDetalhe(){
   html += '</div>';
 
   html += '<div class="section"><button class="btn btn-secondary" onclick="Modals.open(\'novo-emprestimo\',\''+pid+'\')">+ Novo empréstimo para '+esc(p.nome)+'</button></div>';
+  html += secaoAnexosPessoa(pid);
 
   html += '<div class="section"><div class="section-head"><h2>Empréstimos</h2></div><div class="list">';
   if(emps.length===0) html += '<div class="empty">Nenhum empréstimo ainda.</div>';
@@ -2082,6 +2092,7 @@ function pagePerfil(){
     + '<div class="row" onclick="Nav.go(\'planejamento\')"><div class="emoji">🗓️</div><div class="info"><div class="title">Planejamento futuro</div></div><div class="muted">›</div></div>'
     + '<div class="row" onclick="Nav.go(\'calendario\')"><div class="emoji">📅</div><div class="info"><div class="title">Calendário</div></div><div class="muted">›</div></div>'
     + '<div class="row" onclick="Nav.go(\'relatorios\')"><div class="emoji">📊</div><div class="info"><div class="title">Relatórios</div></div><div class="muted">›</div></div>'
+    + '<div class="row" onclick="Modals.open(\'alarmes\')"><div class="emoji">🔔</div><div class="info"><div class="title">Alarmes de empréstimos</div></div><div class="muted">›</div></div>'
     + '</div></div>';
 
   html += '<div class="section"><div class="section-head"><h2>Aparência</h2></div><div class="card">';
@@ -2100,7 +2111,7 @@ function pagePerfil(){
     + '<button class="btn btn-secondary" style="margin-bottom:8px;width:100%;" onclick="Actions.exportarDados()">📤 Exportar backup (.json)</button>'
     + '<input type="file" id="import-file-input" accept="application/json,.json" style="display:none" onchange="Actions.processarImportacao(this)">'
     + '<button class="btn btn-secondary" style="margin-bottom:8px;width:100%;" onclick="document.getElementById(\'import-file-input\').click()">📥 Importar backup (.json)</button>'
-    + '<div class="hint" style="margin-bottom:14px;">Exporte antes de trocar de aparelho ou de instalar como app — o backup tem todos os seus dados. Importar substitui os dados atuais.</div>'
+    + '<div class="hint" style="margin-bottom:14px;">Exporte antes de trocar de aparelho ou de instalar como app — o backup tem todos os seus dados, inclusive documentos e fotos. Importar substitui os dados atuais.</div>'
     + '<button class="btn btn-danger" onclick="Actions.apagarTodosDados()">Apagar todos os dados</button>'
     + '<div class="hint">Remove entradas, saídas, empréstimos e histórico salvos neste dispositivo. Essa ação não pode ser desfeita.</div></div>';
   return html;
@@ -2272,6 +2283,10 @@ function modalContent(){
   if(m==="ver-dia") return sheetVerDia(UI.modalData);
   if(m==="emp-dia") return sheetEmpDia(UI.modalData);
   if(m==="detalhe") return sheetDetalhe(UI.modalData);
+  if(m==="alarmes") return sheetAlarmes();
+  if(m==="ver-anexo") return sheetVerAnexo(UI.modalData);
+  if(m==="estender-emprestimo") return sheetEstenderEmprestimo(UI.modalData);
+  if(m==="estender-parcelada") return sheetEstenderParcelada(UI.modalData);
   return "";
 }
 
@@ -2476,7 +2491,8 @@ function sheetVerParcelada(id){
       + ' <button class="btn btn-sm btn-danger" onclick="Actions.excluirSaida(\'parcelada\',\''+p.id+'\',\''+pc.numero+'\')">Excluir</button>'
       + '</div></div></div>';
   });
-  html += '</div><div class="btn-row"><button class="btn btn-secondary" onclick="Modals.close()">Fechar</button></div>';
+  html += '</div><div class="btn-row" style="margin-bottom:8px;"><button class="btn btn-primary" onclick="Modals.open(\'estender-parcelada\',\''+p.id+'\')">➕ Aumentar parcelas</button></div>';
+  html += '<div class="btn-row"><button class="btn btn-secondary" onclick="Modals.close()">Fechar</button></div>';
   return html;
 }
 function sheetVerRecorrente(id){
@@ -2591,6 +2607,9 @@ function sheetVerEmprestimo(id){
         + (selIds.length>0 ? '<button class="btn btn-danger btn-sm" style="flex:none;" onclick="Actions.excluirSelecionadas(\''+e.id+'\',\'juros\')">Excluir</button>' : '')
         + '</div>';
     }
+    if(!selAtivo && e.status!=="quitado" && e.status!=="vendido"){
+      html2 += '<div class="btn-row" style="margin-bottom:8px;"><button class="btn btn-primary" onclick="Modals.open(\'estender-emprestimo\',\''+e.id+'\')">➕ Estender empréstimo</button></div>';
+    }
     if(!selAtivo && e.jurosOcorrencias.some(function(o){return o.status!=="pago";})){
       html2 += '<div class="btn-row" style="margin-bottom:8px;"><button class="btn btn-danger" onclick="Actions.excluirTodosJurosPendentes(\''+e.id+'\')">Excluir todas as parcelas de juros pendentes</button></div>';
     }
@@ -2644,6 +2663,9 @@ function sheetVerEmprestimo(id){
       + (selIds.length>0 ? '<button class="btn btn-danger btn-sm" style="flex:none;" onclick="Actions.excluirSelecionadas(\''+e.id+'\',\'parcelado\')">Excluir</button>' : '')
       + '</div>';
     return html;
+  }
+  if(e.status!=="vendido"){
+    html += '<div class="btn-row" style="margin-bottom:8px;"><button class="btn btn-primary" onclick="Modals.open(\'estender-emprestimo\',\''+e.id+'\')">➕ Aumentar parcelas</button></div>';
   }
   html += '<div class="btn-row" style="margin-bottom:8px;"><button class="btn btn-danger" onclick="Actions.excluirTodasParcelasEmp(\''+e.id+'\')">Excluir todas as parcelas</button></div>';
   if(e.status!=="vendido" && e.status!=="quitado"){
@@ -2955,6 +2977,7 @@ window.Actions = {
       render(); scheduleSave(); showToast("Empréstimo quitado ✓");
     } else if(c.tipo==="resetTudo"){
       try{ localStorage.removeItem("financas-alif-state"); }catch(ex){}
+      substituirAnexos([]).then(function(){ render(); });
       var nome = STATE.perfil.nome;
       STATE = defaultState();
       STATE.perfil.nome = nome;
@@ -2962,7 +2985,21 @@ window.Actions = {
       UI.page = "dashboard"; UI.pessoaSel = null;
       render(); scheduleSave();
       showToast("Todos os dados foram apagados");
+    } else if(c.tipo==="excluirAnexo"){
+      var idAnx = c.args[0];
+      anexosTx("readwrite", function(st){ st.delete(idAnx); }).then(function(){
+        if(ANEXO_URLS[idAnx]){ URL.revokeObjectURL(ANEXO_URLS[idAnx]); delete ANEXO_URLS[idAnx]; }
+        ANEXOS = ANEXOS.filter(function(a){ return a.id!==idAnx; });
+        Modals.close(); showToast("Arquivo excluído");
+      }).catch(function(){ render(); showToast("Não foi possível excluir"); });
     } else if(c.tipo==="importarDados"){
+      var anexosImport = c.args[0]._anexos;
+      delete c.args[0]._anexos;
+      if(Array.isArray(anexosImport)){
+        substituirAnexos(anexosImport.map(function(a){
+          return { id:a.id, pessoaId:a.pessoaId, nome:a.nome, tipo:a.tipo, tamanho:a.tamanho, criadoEm:a.criadoEm, blob:dataURLParaBlob(a.dataURL) };
+        })).then(function(){ render(); });
+      }
       STATE = c.args[0];
       if(!STATE.eventosHistorico) STATE.eventosHistorico = [];
       if(!STATE.compromissos) STATE.compromissos = [];
@@ -3010,7 +3047,17 @@ window.Actions = {
     render();
   },
   exportarDados: function(){
-    var json = JSON.stringify(STATE, null, 2);
+    if(ANEXOS.length && !this._exportandoComAnexos){
+      var self = this;
+      showToast("Preparando backup com os arquivos…");
+      Promise.all(ANEXOS.map(anexoParaDataURL)).then(function(lista){
+        self._exportandoComAnexos = lista.filter(Boolean);
+        try{ self.exportarDados(); } finally { self._exportandoComAnexos = null; }
+      });
+      return;
+    }
+    var copia = this._exportandoComAnexos ? Object.assign({}, STATE, {_anexos:this._exportandoComAnexos}) : STATE;
+    var json = JSON.stringify(copia, null, 2);
     var d = new Date();
     var pad = function(n){ return n<10 ? "0"+n : ""+n; };
     var fname = "financas-alif-backup-"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+".json";
@@ -3062,6 +3109,570 @@ window.Forms.togglePessoaNova = function(sel){
   wrap.style.display = sel.value==="__novo__" ? "block" : "none";
 };
 
+/* ============================== ALARMES E AVISOS DE VENCIMENTO ============================== */
+function cfgAlarmes(){
+  if(!STATE.perfil.alarmes) STATE.perfil.alarmes = { hora:"08:00", diaAntes:true };
+  return STATE.perfil.alarmes;
+}
+function brlReal(n){ n = Number(n)||0; return n.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}); }
+function isoMaisDias(iso, n){
+  var p = iso.split("-").map(Number);
+  var d = new Date(p[0], p[1]-1, p[2]+n);
+  return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+}
+/* todos os vencimentos de empréstimo ainda não pagos, a partir de uma data */
+function vencimentosEmprestimoDesde(desdeISO, ateISO){
+  var out = [];
+  STATE.emprestimos.forEach(function(e){
+    if(e.status==="vendido" || e.status==="quitado") return;
+    var nome = pessoaNome(e.pessoaId);
+    if(e.tipoCobranca==="juros"){
+      (e.jurosOcorrencias||[]).forEach(function(o){
+        if(o.status==="pago" || o.vencimento<desdeISO || (ateISO && o.vencimento>ateISO)) return;
+        out.push({ emp:e, nome:nome, vencimento:o.vencimento, valor:o.valor, ref:o.mesAno, label:"juro de "+monthLabel(o.mesAno) });
+      });
+    } else {
+      (e.parcelas||[]).forEach(function(p){
+        if(p.status==="pago" || p.vencimento<desdeISO || (ateISO && p.vencimento>ateISO)) return;
+        out.push({ emp:e, nome:nome, vencimento:p.vencimento, valor:p.valor, ref:String(p.numero), label:"parcela "+p.numero+"/"+e.qtdParcelas });
+      });
+    }
+  });
+  return out.sort(function(a,b){ return cmpKey(a.vencimento,b.vencimento); });
+}
+function avisosDeHoje(){
+  ensureAllGenerated();
+  var hoje = todayISO(), amanha = isoMaisDias(hoje,1);
+  var atrasados = [];
+  STATE.emprestimos.forEach(function(e){
+    if(e.status==="vendido" || e.status==="quitado") return;
+    var lista = e.tipoCobranca==="juros" ? (e.jurosOcorrencias||[]) : (e.parcelas||[]);
+    lista.forEach(function(x){ if(x.status!=="pago" && x.vencimento<hoje) atrasados.push(x); });
+  });
+  return {
+    hoje: vencimentosEmprestimoDesde(hoje, hoje),
+    amanha: cfgAlarmes().diaAntes ? vencimentosEmprestimoDesde(amanha, amanha) : [],
+    atrasados: atrasados.length
+  };
+}
+function resumoNomes(lista){
+  return lista.map(function(it){ return it.nome+" ("+fmtBRL(it.valor)+")"; }).join(", ");
+}
+/* faixa no topo do painel */
+function bannerVencimentos(){
+  var a = avisosDeHoje();
+  var html = "";
+  if(a.hoje.length){
+    html += '<div class="insight aviso-hoje" style="cursor:pointer;" onclick="Modals.open(\'emp-dia\',\''+todayISO()+'\')"><span class="in-ic">🔔</span><span style="flex:1;"><b>Hoje vence:</b> '+esc(resumoNomes(a.hoje))+'</span>'+ic("chevR")+'</div>';
+  }
+  if(a.amanha.length){
+    html += '<div class="insight" style="cursor:pointer;" onclick="Modals.open(\'emp-dia\',\''+isoMaisDias(todayISO(),1)+'\')"><span class="in-ic">⏰</span><span style="flex:1;"><b>Amanhã vence:</b> '+esc(resumoNomes(a.amanha))+'</span>'+ic("chevR")+'</div>';
+  }
+  if(a.atrasados){
+    html += '<div class="insight" style="cursor:pointer;" onclick="Nav.go(\'emprestimos\')"><span class="in-ic" style="color:var(--critical)">'+ic("alert")+'</span><span style="flex:1;"><b style="color:var(--critical)">'+a.atrasados+'</b> recebimento'+(a.atrasados===1?"":"s")+' de empréstimo atrasado'+(a.atrasados===1?"":"s")+'</span>'+ic("chevR")+'</div>';
+  }
+  return html ? '<div class="section">'+html+'</div>' : "";
+}
+/* notificação do celular ao abrir o app (uma vez por dia) */
+function checarNotificacaoDoDia(){
+  try{
+    if(!("Notification" in window) || Notification.permission!=="granted") return;
+    if(cfgAlarmes().avisoAbrir===false) return;
+    var hoje = todayISO();
+    if(localStorage.getItem("financas-alif-ultimo-aviso")===hoje) return;
+    var a = avisosDeHoje();
+    if(!a.hoje.length && !a.amanha.length) return;
+    var titulo = a.hoje.length ? "🔔 Hoje vence empréstimo" : "⏰ Amanhã vence empréstimo";
+    var corpo = [];
+    if(a.hoje.length) corpo.push("Hoje: "+a.hoje.map(function(it){ return it.nome+" "+brlReal(it.valor)+" ("+it.label+")"; }).join("; "));
+    if(a.amanha.length) corpo.push("Amanhã: "+a.amanha.map(function(it){ return it.nome+" "+brlReal(it.valor); }).join("; "));
+    var opts = { body: corpo.join("\n"), icon:"icons/icon-192.png", badge:"icons/icon-192.png", tag:"vencimentos-"+hoje };
+    localStorage.setItem("financas-alif-ultimo-aviso", hoje);
+    if(navigator.serviceWorker && navigator.serviceWorker.ready){
+      navigator.serviceWorker.ready.then(function(reg){ reg.showNotification(titulo, opts); })
+        .catch(function(){ try{ new Notification(titulo, opts); }catch(e){} });
+    } else {
+      new Notification(titulo, opts);
+    }
+  }catch(e){}
+}
+
+/* arquivo de agenda (.ics) com um alarme por vencimento */
+function icsEsc(s){ return String(s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\r?\n/g,"\\n"); }
+function icsDobra(linha){
+  var enc = new TextEncoder(), out = [], atual = "", bytes = 0;
+  Array.from(linha).forEach(function(ch){
+    var b = enc.encode(ch).length;
+    if(bytes + b > 73){ out.push(atual); atual = " "; bytes = 1; }
+    atual += ch; bytes += b;
+  });
+  out.push(atual);
+  return out.join("\r\n");
+}
+function icsData(iso, hhmm, somaMin){
+  var p = iso.split("-").map(Number), h = hhmm.split(":").map(Number);
+  var d = new Date(p[0], p[1]-1, p[2], h[0], h[1]+(somaMin||0));
+  return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+"T"+pad(d.getHours())+pad(d.getMinutes())+"00";
+}
+function gerarICS(){
+  ensureAllGenerated();
+  var cfg = cfgAlarmes();
+  var hora = cfg.hora || "08:00";
+  var itens = vencimentosEmprestimoDesde(todayISO());
+  var agora = new Date();
+  var stamp = agora.getUTCFullYear()+pad(agora.getUTCMonth()+1)+pad(agora.getUTCDate())+"T"+pad(agora.getUTCHours())+pad(agora.getUTCMinutes())+"00Z";
+  var L = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Financas do ALIF//Alarmes//PT","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:Empréstimos a receber"];
+  var qtd = 0;
+  function evento(uid, dataISO, titulo, desc){
+    L.push("BEGIN:VEVENT","UID:"+uid+"@financas-alif","DTSTAMP:"+stamp,
+      "DTSTART:"+icsData(dataISO,hora,0),"DTEND:"+icsData(dataISO,hora,15),
+      "SUMMARY:"+icsEsc(titulo),"DESCRIPTION:"+icsEsc(desc),
+      "BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsEsc(titulo),"TRIGGER:PT0M","END:VALARM",
+      "END:VEVENT");
+    qtd++;
+  }
+  itens.forEach(function(it){
+    var desc = "Receber de "+it.nome+": "+brlReal(it.valor)+" ("+it.label+")\nVencimento: "+fmtDate(it.vencimento)+"\nEmprestado: "+brlReal(it.emp.valorOriginal);
+    var base = it.emp.id+"-"+it.ref;
+    evento(base+"-dia", it.vencimento, "💰 Vence hoje: "+it.nome+" — "+brlReal(it.valor), desc);
+    if(cfg.diaAntes){
+      var antes = isoMaisDias(it.vencimento,-1);
+      if(antes>=todayISO()) evento(base+"-antes", antes, "⏰ Amanhã vence: "+it.nome+" — "+brlReal(it.valor), desc);
+    }
+  });
+  L.push("END:VCALENDAR");
+  return { texto: L.map(icsDobra).join("\r\n")+"\r\n", qtd: qtd, vencimentos: itens.length };
+}
+
+function sheetAlarmes(){
+  var cfg = cfgAlarmes();
+  var qtd = vencimentosEmprestimoDesde(todayISO()).length;
+  var notifSuportada = ("Notification" in window);
+  var perm = notifSuportada ? Notification.permission : "indisponivel";
+  var html = '<h3>🔔 Alarmes de empréstimos</h3><div class="sheet-sub">O celular toca no dia de cada vencimento, mesmo com o app fechado.</div>';
+  html += '<div class="card" style="margin-bottom:14px;">';
+  html += '<div class="field"><label>Horário do alarme</label><input type="time" id="f_alarme_hora" value="'+attr(cfg.hora||"08:00")+'" onchange="Actions.salvarConfigAlarme()"></div>';
+  html += '<div class="field" style="margin-bottom:0;"><label style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--ink);cursor:pointer;"><input type="checkbox" id="f_alarme_antes" '+(cfg.diaAntes?"checked":"")+' onchange="Actions.salvarConfigAlarme()"> Avisar também 1 dia antes</label></div>';
+  html += '</div>';
+  html += '<div class="kpi-line"><span>Vencimentos a partir de hoje</span><span class="v">'+qtd+'</span></div>';
+  html += '<button class="btn btn-primary" style="width:100%;margin-top:12px;" onclick="Actions.gerarAlarmes()"'+(qtd?"":" disabled")+'>📅 Colocar alarmes na agenda</button>';
+  html += '<div class="hint">Vai baixar o arquivo <b>alarmes-emprestimos.ics</b>. Abra esse arquivo e escolha a <b>Agenda</b> (Google Agenda ou a agenda do celular) para adicionar. Sempre que cadastrar ou receber um empréstimo, gere de novo. Se o alarme não tocar, ative as notificações da agenda nas configurações dela.</div>';
+
+  html += '<div class="section-head" style="margin-top:20px;"><h2>Aviso ao abrir o app</h2></div>';
+  if(perm==="granted"){
+    html += '<div class="kpi-line"><span>Notificação do celular</span><span class="v" style="color:var(--accent-strong)">✅ Ativada</span></div>';
+    html += '<button class="btn btn-secondary" style="width:100%;margin-top:8px;" onclick="Actions.testarNotificacao()">Testar aviso agora</button>';
+  } else if(perm==="denied"){
+    html += '<div class="hint">As notificações foram bloqueadas. Para liberar, vá nas configurações do celular → Apps → Finanças (ou Chrome) → Notificações.</div>';
+  } else if(perm==="default"){
+    html += '<button class="btn btn-secondary" style="width:100%;" onclick="Actions.ativarNotificacoes()">🔔 Ativar avisos ao abrir</button>';
+  } else {
+    html += '<div class="hint">Este navegador não permite notificações. O aviso continua aparecendo no topo da tela inicial do app.</div>';
+  }
+  html += '<div class="hint">Quando você abre o app num dia de vencimento, aparece um aviso no topo da tela e uma notificação do celular.</div>';
+  html += '<div class="btn-row" style="margin-top:14px;"><button class="btn btn-secondary" onclick="Modals.close()">Fechar</button></div>';
+  return html;
+}
+
+/* ============================== ANEXOS (documentos e fotos por pessoa) ============================== */
+var ANEXOS = [];
+var ANEXO_URLS = {};
+var anexosDBPromise = null;
+function anexosDB(){
+  if(anexosDBPromise) return anexosDBPromise;
+  anexosDBPromise = new Promise(function(res, rej){
+    if(!window.indexedDB){ rej(new Error("sem indexedDB")); return; }
+    var r = indexedDB.open("financas-alif-anexos", 1);
+    r.onupgradeneeded = function(){ r.result.createObjectStore("anexos", {keyPath:"id"}); };
+    r.onsuccess = function(){ res(r.result); };
+    r.onerror = function(){ rej(r.error); };
+  });
+  return anexosDBPromise;
+}
+function anexosTx(modo, fn){
+  return anexosDB().then(function(db){
+    return new Promise(function(res, rej){
+      var tx = db.transaction("anexos", modo);
+      var st = tx.objectStore("anexos");
+      var out = fn(st);
+      tx.oncomplete = function(){ res(out && out.result!==undefined ? out.result : out); };
+      tx.onerror = function(){ rej(tx.error); };
+      tx.onabort = function(){ rej(tx.error); };
+    });
+  });
+}
+function carregarAnexos(){
+  return anexosTx("readonly", function(st){ return st.getAll(); }).then(function(lista){
+    ANEXOS = (lista||[]).sort(function(a,b){ return cmpKey(a.criadoEm||"", b.criadoEm||""); });
+  }).catch(function(){ ANEXOS = []; });
+}
+function anexoURL(a){
+  if(!ANEXO_URLS[a.id]) ANEXO_URLS[a.id] = URL.createObjectURL(a.blob);
+  return ANEXO_URLS[a.id];
+}
+function anexoEhImagem(a){ return /^image\//.test(a.tipo||""); }
+function fmtTamanho(n){ n=n||0; if(n<1024) return n+" B"; if(n<1048576) return Math.round(n/1024)+" KB"; return (n/1048576).toFixed(1).replace(".",",")+" MB"; }
+function comprimirImagem(file){
+  return new Promise(function(res){
+    if(!/^image\/(jpeg|png|webp|heic|heif)/.test(file.type)){ res(file); return; }
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function(){
+      try{
+        var max = 1800, w = img.naturalWidth, h = img.naturalHeight;
+        var esc2 = Math.min(1, max/Math.max(w,h));
+        var c = document.createElement("canvas");
+        c.width = Math.round(w*esc2); c.height = Math.round(h*esc2);
+        var ctx = c.getContext("2d");
+        ctx.fillStyle = "#fff"; ctx.fillRect(0,0,c.width,c.height);
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        c.toBlob(function(b){ URL.revokeObjectURL(url); res(b && b.size < file.size ? b : file); }, "image/jpeg", 0.85);
+      }catch(e){ URL.revokeObjectURL(url); res(file); }
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); res(file); };
+    img.src = url;
+  });
+}
+function secaoAnexosPessoa(pid){
+  var lista = ANEXOS.filter(function(a){ return a.pessoaId===pid; });
+  var html = '<div class="section"><div class="section-head"><h2>Documentos e fotos</h2><span class="small muted">'+lista.length+' arquivo'+(lista.length===1?"":"s")+'</span></div>';
+  html += '<input type="file" id="anexo-foto" accept="image/*" capture="environment" style="display:none" onchange="Actions.anexarArquivos(this,\''+pid+'\')">';
+  html += '<input type="file" id="anexo-arquivo" accept="image/*,application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.txt" multiple style="display:none" onchange="Actions.anexarArquivos(this,\''+pid+'\')">';
+  if(lista.length){
+    html += '<div class="anexo-grid">';
+    lista.forEach(function(a){
+      html += '<div class="anexo" onclick="Modals.open(\'ver-anexo\',\''+a.id+'\')">'
+        + (anexoEhImagem(a) ? '<img src="'+anexoURL(a)+'" alt="">' : '<div class="anexo-ic">📄</div>')
+        + '<div class="nm">'+esc(a.nome)+'</div></div>';
+    });
+    html += '</div>';
+  } else {
+    html += '<div class="empty">Nenhum documento ainda. Anexe RG, contrato, comprovante ou foto.</div>';
+  }
+  html += '<div class="btn-row" style="margin-top:10px;">'
+    + '<button class="btn btn-secondary" onclick="document.getElementById(\'anexo-foto\').click()">📷 Tirar foto</button>'
+    + '<button class="btn btn-secondary" onclick="document.getElementById(\'anexo-arquivo\').click()">📎 Anexar arquivo</button>'
+    + '</div></div>';
+  return html;
+}
+function sheetVerAnexo(id){
+  var a = ANEXOS.find(function(x){ return x.id===id; });
+  if(!a) return '<h3>Arquivo não encontrado</h3><div class="btn-row"><button class="btn btn-secondary" onclick="Modals.close()">Fechar</button></div>';
+  var url = anexoURL(a);
+  var html = '<h3>'+esc(a.nome)+'</h3><div class="sheet-sub">'+esc(pessoaNome(a.pessoaId))+' • '+fmtDate(a.criadoEm)+' • '+fmtTamanho(a.tamanho)+'</div>';
+  if(anexoEhImagem(a)){
+    html += '<div style="margin-bottom:14px;text-align:center;"><img src="'+url+'" alt="" style="max-width:100%;max-height:60vh;border-radius:14px;"></div>';
+  } else {
+    html += '<div class="card" style="text-align:center;margin-bottom:14px;font-size:44px;">📄</div>';
+  }
+  html += '<div class="field"><label>Nome do arquivo</label><input id="f_anexo_nome" value="'+attr(a.nome)+'" onchange="Actions.renomearAnexo(\''+a.id+'\')"></div>';
+  html += '<div class="btn-row">'
+    + '<a class="btn btn-primary" href="'+url+'" target="_blank" rel="noopener" download="'+attr(a.nome)+'" style="text-decoration:none;">Abrir / baixar</a>'
+    + ((navigator.canShare) ? '<button class="btn btn-secondary" onclick="Actions.compartilharAnexo(\''+a.id+'\')">Compartilhar</button>' : '')
+    + '</div>';
+  html += '<div class="btn-row" style="margin-top:8px;">'
+    + '<button class="btn btn-danger" onclick="Actions.excluirAnexo(\''+a.id+'\')">Excluir</button>'
+    + '<button class="btn btn-secondary" onclick="Modals.close()">Fechar</button></div>';
+  return html;
+}
+function anexoParaDataURL(a){
+  return new Promise(function(res){
+    var r = new FileReader();
+    r.onload = function(){ res({ id:a.id, pessoaId:a.pessoaId, nome:a.nome, tipo:a.tipo, tamanho:a.tamanho, criadoEm:a.criadoEm, dataURL:r.result }); };
+    r.onerror = function(){ res(null); };
+    r.readAsDataURL(a.blob);
+  });
+}
+function dataURLParaBlob(du){
+  var partes = du.split(","), mime = (partes[0].match(/:(.*?);/)||[])[1] || "application/octet-stream";
+  var bin = atob(partes[1]), arr = new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], {type:mime});
+}
+function substituirAnexos(lista){
+  Object.keys(ANEXO_URLS).forEach(function(k){ URL.revokeObjectURL(ANEXO_URLS[k]); });
+  ANEXO_URLS = {};
+  return anexosTx("readwrite", function(st){
+    st.clear();
+    lista.forEach(function(a){ st.put(a); });
+  }).then(carregarAnexos);
+}
+
+(function(){
+  var novos = {
+    salvarConfigAlarme: function(){
+      var cfg = cfgAlarmes();
+      var h = document.getElementById("f_alarme_hora"), d = document.getElementById("f_alarme_antes");
+      if(h && h.value) cfg.hora = h.value;
+      if(d) cfg.diaAntes = d.checked;
+      scheduleSave(); render();
+    },
+    gerarAlarmes: function(){
+      var r = gerarICS();
+      if(!r.vencimentos){ showToast("Nenhum vencimento futuro"); return; }
+      var nome = "alarmes-emprestimos.ics";
+      var blob = new Blob([r.texto], {type:"text/calendar;charset=utf-8"});
+      var baixar = function(){
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url; a.download = nome;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+        showToast(r.qtd+" alarmes gerados — abra o arquivo baixado");
+      };
+      try{
+        var file = new File([blob], nome, {type:"text/calendar"});
+        if(navigator.canShare && navigator.canShare({files:[file]})){
+          navigator.share({ files:[file], title:"Alarmes de empréstimos" })
+            .then(function(){ showToast(r.qtd+" alarmes prontos"); })
+            .catch(function(err){ if(!err || err.name!=="AbortError") baixar(); });
+          return;
+        }
+      }catch(e){}
+      baixar();
+    },
+    ativarNotificacoes: function(){
+      if(!("Notification" in window)){ showToast("Este navegador não permite notificações"); return; }
+      Notification.requestPermission().then(function(p){
+        if(p==="granted"){
+          cfgAlarmes().avisoAbrir = true; scheduleSave();
+          showToast("Avisos ativados ✓");
+          try{ localStorage.removeItem("financas-alif-ultimo-aviso"); }catch(e){}
+          checarNotificacaoDoDia();
+        } else {
+          showToast("Permissão não concedida");
+        }
+        render();
+      });
+    },
+    testarNotificacao: function(){
+      var opts = { body:"Os avisos de vencimento estão funcionando.", icon:"icons/icon-192.png", tag:"teste" };
+      if(navigator.serviceWorker && navigator.serviceWorker.ready){
+        navigator.serviceWorker.ready.then(function(reg){ reg.showNotification("🔔 Finanças do ALIF", opts); });
+      } else { try{ new Notification("🔔 Finanças do ALIF", opts); }catch(e){} }
+    },
+    anexarArquivos: function(input, pid){
+      var files = Array.prototype.slice.call(input.files||[]);
+      input.value = "";
+      if(!files.length) return;
+      var grandes = files.filter(function(f){ return f.size > 25*1024*1024; });
+      files = files.filter(function(f){ return f.size <= 25*1024*1024; });
+      if(grandes.length) showToast("Arquivo acima de 25 MB não foi anexado");
+      if(!files.length) return;
+      showToast("Salvando…");
+      Promise.all(files.map(function(f){
+        return comprimirImagem(f).then(function(b){
+          var ehFotoComprimida = b!==f;
+          var nome = f.name || "foto.jpg";
+          if(ehFotoComprimida) nome = nome.replace(/\.(heic|heif|png|webp)$/i, ".jpg");
+          if(/^image\.|^IMG_|^\d{8,}/.test(nome) || !f.name) nome = "Foto "+fmtDate(todayISO())+".jpg";
+          return { id:uid("anx"), pessoaId:pid, nome:nome, tipo:b.type||f.type||"application/octet-stream", tamanho:b.size, criadoEm:todayISO(), blob:b };
+        });
+      })).then(function(novosAnexos){
+        return anexosTx("readwrite", function(st){ novosAnexos.forEach(function(a){ st.put(a); }); }).then(function(){
+          ANEXOS = ANEXOS.concat(novosAnexos);
+          render();
+          showToast(novosAnexos.length===1 ? "Arquivo anexado ✓" : novosAnexos.length+" arquivos anexados ✓");
+        });
+      }).catch(function(){ showToast("Não foi possível salvar o arquivo (memória cheia?)"); });
+    },
+    renomearAnexo: function(id){
+      var a = ANEXOS.find(function(x){ return x.id===id; });
+      var el = document.getElementById("f_anexo_nome");
+      if(!a || !el || !el.value.trim()) return;
+      a.nome = el.value.trim();
+      anexosTx("readwrite", function(st){ st.put(a); }).then(function(){ showToast("Nome salvo"); render(); });
+    },
+    compartilharAnexo: function(id){
+      var a = ANEXOS.find(function(x){ return x.id===id; });
+      if(!a) return;
+      try{
+        var f = new File([a.blob], a.nome, {type:a.tipo});
+        if(navigator.canShare && navigator.canShare({files:[f]})){ navigator.share({files:[f], title:a.nome}).catch(function(){}); return; }
+      }catch(e){}
+      showToast("Compartilhamento não disponível aqui");
+    },
+    excluirAnexo: function(id){
+      UI.confirm = { tipo:"excluirAnexo", args:[id], mensagem:"Excluir este arquivo? Essa ação não pode ser desfeita.", label:"Excluir" };
+      render();
+    }
+  };
+  Object.keys(novos).forEach(function(k){ window.Actions[k] = novos[k]; });
+})();
+
+
+/* ============================== ESTENDER / AUMENTAR PARCELAS ============================== */
+function proximoVencimentoApos(ultimoISO, dia){
+  return dateFromMesAnoDia(addMonthsToKey(monthKey(ultimoISO), 1), dia);
+}
+function ultimaParcela(lista){
+  return lista.reduce(function(m,x){ return (!m || x.numero>m.numero) ? x : m; }, null);
+}
+/* empréstimo parcelado: modo "cobrar" adiciona parcelas novas (valor a mais = juros);
+   modo "redividir" espalha o que falta pagar em mais parcelas (total igual) */
+function estenderEmprestimoParcelado(e, n, modo, valorNova){
+  var dia = dayOf(e.primeiraDataPagamento);
+  var ult = ultimaParcela(e.parcelas);
+  var proxNum = Math.max(e.qtdParcelas||0, ult?ult.numero:0) + 1;
+  var venc = ult ? ult.vencimento : e.primeiraDataPagamento;
+  var novas = [];
+  for(var i=0;i<n;i++){
+    venc = (i===0 && !ult) ? e.primeiraDataPagamento : proximoVencimentoApos(venc, dia);
+    novas.push({ numero:proxNum+i, valor:0, vencimento:venc, status:"pendente", dataPagamento:null });
+  }
+  if(modo==="redividir"){
+    var pend = e.parcelas.filter(function(x){ return x.status!=="pago" && x.status!=="cancelado"; });
+    var falta = pend.reduce(function(s,x){ return s+x.valor; },0);
+    var todas = pend.concat(novas);
+    var base = Math.floor(falta/todas.length*100)/100, soma = 0;
+    todas.forEach(function(x,idx){
+      x.valor = (idx===todas.length-1) ? Math.round((falta-soma)*100)/100 : base;
+      soma += x.valor;
+    });
+  } else {
+    novas.forEach(function(x){ x.valor = valorNova; });
+    var extra = Math.round(valorNova*n*100)/100;
+    e.valorTotal = Math.round((e.valorTotal+extra)*100)/100;
+    e.valorJuros = Math.round((e.valorJuros+extra)*100)/100;
+  }
+  e.parcelas = e.parcelas.concat(novas);
+  e.qtdParcelas = proxNum + n - 1;
+  if(e.status==="quitado") e.status = "ativo";
+  pushEvento("emprestimo", "Empréstimo de "+pessoaNome(e.pessoaId)+" estendido em "+n+" parcela"+(n===1?"":"s"), modo==="redividir"?0:valorNova*n);
+}
+function estenderEmprestimoJuros(e, n){
+  var pagasOuGeradas = (e.jurosOcorrencias||[]).length + (e.jurosExcluidas||[]).length;
+  e.qtdParcelasJuros = Math.max(e.qtdParcelasJuros||0, pagasOuGeradas) + n;
+  e.jurosPausado = false;
+  ensureJurosEmprestimo(e);
+  pushEvento("emprestimo", "Empréstimo de "+pessoaNome(e.pessoaId)+" estendido em "+n+" mês"+(n===1?"":"es")+" de juros", e.jurosMensal*n);
+}
+function estenderParcelada(p, n, valor){
+  var dia = dayOf(p.parcelas.length ? p.parcelas[0].vencimento : dateFromMesAnoDia(p.primeiraMesAno,1));
+  var ult = ultimaParcela(p.parcelas);
+  var proxNum = Math.max(p.qtdParcelas||0, ult?ult.numero:0) + 1;
+  var venc = ult ? ult.vencimento : dateFromMesAnoDia(p.primeiraMesAno, dia);
+  for(var i=0;i<n;i++){
+    venc = (i===0 && !ult) ? venc : proximoVencimentoApos(venc, dia);
+    p.parcelas.push({ numero:proxNum+i, valor:valor, vencimento:venc, status:"pendente", dataPagamento:null });
+  }
+  p.qtdParcelas = proxNum + n - 1;
+}
+
+function campoQtdExtra(idPreview){
+  return '<div class="field"><label>Quantas parcelas a mais?</label><input id="f_ext_qtd" type="number" inputmode="numeric" min="1" max="120" value="1" oninput="Forms.previewEstender()"></div>';
+}
+function sheetEstenderEmprestimo(id){
+  var e = STATE.emprestimos.find(function(x){ return x.id===id; });
+  if(!e) return "";
+  var nome = esc(pessoaNome(e.pessoaId));
+  var voltar = '<button class="btn btn-secondary" onclick="Modals.open(\'ver-emprestimo\',\''+e.id+'\')">Voltar</button>';
+  var html = '<h3>➕ Estender empréstimo</h3>';
+  if(e.tipoCobranca==="juros"){
+    if(!e.qtdParcelasJuros && !e.jurosPausado){
+      return html + '<div class="sheet-sub">'+nome+' • só juros</div><div class="insight">Este empréstimo não tem número de meses definido — os juros já continuam sendo cobrados todo mês até você quitar.</div><div class="btn-row" style="margin-top:12px;">'+voltar+'</div>';
+    }
+    html += '<div class="sheet-sub">'+nome+' • '+(e.qtdParcelasJuros?('hoje: '+e.qtdParcelasJuros+' meses de juros'):'juros pausados')+' • '+fmtBRL(e.jurosMensal)+'/mês</div>';
+    html += '<div class="field"><label>Quantos meses de juros a mais?</label><input id="f_ext_qtd" type="number" inputmode="numeric" min="1" max="120" value="1" oninput="Forms.previewEstender()"></div>';
+    html += '<div class="card" id="ext_preview" data-tipo="juros" data-juros="'+e.jurosMensal+'" data-atual="'+(e.qtdParcelasJuros||0)+'"></div>';
+  } else {
+    var pend = e.parcelas.filter(function(x){ return x.status!=="pago" && x.status!=="cancelado"; });
+    var falta = pend.reduce(function(s,x){ return s+x.valor; },0);
+    var ult = ultimaParcela(e.parcelas);
+    var modo = UI.extModo || "cobrar";
+    html += '<div class="sheet-sub">'+nome+' • hoje: '+e.qtdParcelas+' parcelas • falta '+fmtBRL(falta)+' em '+pend.length+' parcela'+(pend.length===1?"":"s")+'</div>';
+    html += '<div class="field"><label>Como aumentar?</label><div class="segmented">'
+      + '<button type="button" class="'+(modo==="cobrar"?"active":"")+'" onclick="Forms.setExtModo(\'cobrar\')">Parcelas novas (cobrar mais)</button>'
+      + '<button type="button" class="'+(modo==="redividir"?"active":"")+'" onclick="Forms.setExtModo(\'redividir\')">Dividir o que falta</button>'
+      + '</div><div class="hint">'+(modo==="cobrar"
+          ? 'Acrescenta parcelas no final. O valor a mais entra como juros do empréstimo.'
+          : 'O total não muda: o que falta pagar é dividido em mais parcelas, cada uma fica menor.')+'</div></div>';
+    html += campoQtdExtra();
+    if(modo==="cobrar"){
+      html += '<div class="field"><label>Valor de cada parcela nova (R$)</label><input id="f_ext_valor" type="number" inputmode="decimal" step="0.01" min="0" value="'+(ult?ult.valor:e.valorTotal/e.qtdParcelas).toFixed(2)+'" oninput="Forms.previewEstender()"></div>';
+    }
+    html += '<div class="card" id="ext_preview" data-tipo="parcelado" data-modo="'+modo+'" data-falta="'+falta+'" data-pend="'+pend.length+'" data-atual="'+e.qtdParcelas+'" data-total="'+e.valorTotal+'"></div>';
+  }
+  html += '<div class="btn-row" style="margin-top:14px;">'+voltar
+    + '<button class="btn btn-primary" onclick="Actions.confirmarEstenderEmprestimo(\''+e.id+'\')">Confirmar</button></div>';
+  return html;
+}
+function sheetEstenderParcelada(id){
+  var p = STATE.saidasParceladas.find(function(x){ return x.id===id; });
+  if(!p) return "";
+  var html = '<h3>➕ Aumentar parcelas</h3><div class="sheet-sub">'+esc(p.nome)+' • hoje: '+p.qtdParcelas+' parcelas de '+fmtBRL(p.valorParcela)+'</div>';
+  html += campoQtdExtra();
+  html += '<div class="field"><label>Valor de cada parcela nova (R$)</label><input id="f_ext_valor" type="number" inputmode="decimal" step="0.01" min="0" value="'+Number(p.valorParcela).toFixed(2)+'" oninput="Forms.previewEstender()"></div>';
+  html += '<div class="card" id="ext_preview" data-tipo="conta" data-atual="'+p.qtdParcelas+'"></div>';
+  html += '<div class="btn-row" style="margin-top:14px;"><button class="btn btn-secondary" onclick="Modals.open(\'ver-parcelada\',\''+p.id+'\')">Voltar</button>'
+    + '<button class="btn btn-primary" onclick="Actions.confirmarEstenderParcelada(\''+p.id+'\')">Confirmar</button></div>';
+  return html;
+}
+function lerQtdExtra(){
+  var n = parseInt((document.getElementById("f_ext_qtd")||{}).value, 10);
+  return (!isNaN(n) && n>0 && n<=120) ? n : 0;
+}
+function lerValorExtra(){
+  var el = document.getElementById("f_ext_valor");
+  if(!el) return null;
+  var v = parseFloat(String(el.value).replace(",", "."));
+  return (!isNaN(v) && v>=0) ? Math.round(v*100)/100 : null;
+}
+window.Forms.setExtModo = function(m){ UI.extModo = m; render(); };
+window.Forms.previewEstender = function(){
+  var box = document.getElementById("ext_preview");
+  if(!box) return;
+  var n = lerQtdExtra(), d = box.dataset, atual = Number(d.atual)||0, html = "";
+  if(!n){ box.innerHTML = '<div class="hint" style="margin:0;">Informe quantas parcelas a mais.</div>'; return; }
+  if(d.tipo==="juros"){
+    html = '<div class="kpi-line"><span>Meses de juros</span><span class="v">'+(atual?atual+' → ':'')+(atual+n)+'</span></div>'
+      + '<div class="kpi-line"><span>Juros a mais</span><span class="v num">'+fmtBRL(Number(d.juros)*n)+'</span></div>';
+  } else if(d.tipo==="parcelado" && d.modo==="redividir"){
+    var tot = (Number(d.pend)||0)+n;
+    html = '<div class="kpi-line"><span>Parcelas</span><span class="v">'+atual+' → '+(atual+n)+'</span></div>'
+      + '<div class="kpi-line"><span>Falta pagar (não muda)</span><span class="v num">'+fmtBRL(Number(d.falta))+'</span></div>'
+      + '<div class="kpi-line"><span>Nova parcela</span><span class="v num">'+fmtBRL(Number(d.falta)/tot)+' × '+tot+'</span></div>';
+  } else {
+    var v = lerValorExtra()||0;
+    html = '<div class="kpi-line"><span>Parcelas</span><span class="v">'+atual+' → '+(atual+n)+'</span></div>'
+      + '<div class="kpi-line"><span>Valor a mais</span><span class="v num">'+fmtBRL(v*n)+'</span></div>'
+      + (d.tipo==="parcelado" ? '<div class="kpi-line"><span>Novo total a receber</span><span class="v num">'+fmtBRL(Number(d.total)+v*n)+'</span></div>' : '');
+  }
+  box.innerHTML = html;
+};
+window.Actions.confirmarEstenderEmprestimo = function(id){
+  var e = STATE.emprestimos.find(function(x){ return x.id===id; });
+  if(!e) return;
+  var n = lerQtdExtra();
+  if(!n){ showToast("Informe quantas parcelas a mais"); return; }
+  if(e.tipoCobranca==="juros"){
+    estenderEmprestimoJuros(e, n);
+  } else {
+    var modo = UI.extModo || "cobrar";
+    if(modo==="redividir" && !e.parcelas.some(function(x){ return x.status!=="pago" && x.status!=="cancelado"; })){
+      showToast("Não há valor pendente para dividir"); return;
+    }
+    var v = modo==="cobrar" ? lerValorExtra() : 0;
+    if(modo==="cobrar" && !v){ showToast("Informe o valor da parcela nova"); return; }
+    estenderEmprestimoParcelado(e, n, modo, v);
+  }
+  UI.extModo = null;
+  scheduleSave();
+  Modals.open("ver-emprestimo", e.id);
+  showToast("Empréstimo estendido ✓");
+};
+window.Actions.confirmarEstenderParcelada = function(id){
+  var p = STATE.saidasParceladas.find(function(x){ return x.id===id; });
+  if(!p) return;
+  var n = lerQtdExtra(), v = lerValorExtra();
+  if(!n){ showToast("Informe quantas parcelas a mais"); return; }
+  if(!v){ showToast("Informe o valor da parcela"); return; }
+  estenderParcelada(p, n, v);
+  scheduleSave();
+  Modals.open("ver-parcelada", p.id);
+  showToast(n+" parcela"+(n===1?"":"s")+" adicionada"+(n===1?"":"s")+" ✓");
+};
+
 
 /* ============================== INIT ============================== */
 function loadInitialState(){
@@ -3106,6 +3717,12 @@ function init(){
   }
 
   render();
+
+  carregarAnexos().then(function(){ if(ANEXOS.length) render(); });
+  setTimeout(checarNotificacaoDoDia, 1500);
+  document.addEventListener("visibilitychange", function(){
+    if(document.visibilityState==="visible"){ checarNotificacaoDoDia(); if(UI.page==="dashboard" && !UI.modal) render(); }
+  });
 
   setTimeout(function(){
     var sp = document.getElementById("splash");

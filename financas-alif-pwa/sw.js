@@ -1,4 +1,4 @@
-const CACHE = "financas-alif-v5";
+const CACHE = "financas-alif-v6";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icons/icon-192.png", "./icons/icon-512.png"];
 
 self.addEventListener("install", function(e){
@@ -22,5 +22,18 @@ self.addEventListener("fetch", function(e){
       caches.open(CACHE).then(function(c){ c.put(e.request, resClone); });
       return res;
     }).catch(function(){ return caches.match(e.request); })
+  );
+});
+
+/* tocar na notificação de vencimento abre (ou traz para frente) o app */
+self.addEventListener("notificationclick", function(e){
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function(lista){
+      for (var i = 0; i < lista.length; i++) {
+        if ("focus" in lista[i]) return lista[i].focus();
+      }
+      return self.clients.openWindow("./");
+    })
   );
 });
